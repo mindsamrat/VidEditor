@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Header from "@/components/Header";
+import ApiKeySetup from "@/components/ApiKeySetup";
 import ScriptInput from "@/components/ScriptInput";
 import SceneList from "@/components/SceneList";
 import AudioSection from "@/components/AudioSection";
@@ -71,6 +72,7 @@ export default function Home() {
       <div className="min-h-screen bg-background">
         <Header />
         <main className="max-w-5xl mx-auto px-6 py-8 space-y-12">
+          <ApiKeySetup />
           <ScriptInput />
           <SceneList />
           <AudioSection />
