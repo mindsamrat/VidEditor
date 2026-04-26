@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "next": "14.2.35",
     "openai": "^6.34.0",
     "react": "^18",

@@ -44,8 +44,9 @@ src/
 │     ├─ series/                    # Series CRUD (stub)
 │     ├─ videos/                    # List videos (stub)
 │     ├─ generate/script/           # Claude — script writer (LIVE)
+│     ├─ generate/scenes/           # Claude — splits a user-provided script into scenes (LIVE)
 │     ├─ generate/image/            # OpenAI gpt-image-1 — visuals (LIVE)
-│     ├─ generate/voice/            # ElevenLabs — voiceover (LIVE)
+│     ├─ generate/voice/            # OpenAI TTS (default) / ElevenLabs (opt-in) (LIVE)
 │     ├─ generate/render/           # Remotion / Shotstack / Creatomate (stub)
 │     ├─ post/tiktok/               # TikTok Content Posting API (stub)
 │     ├─ post/instagram/            # Instagram Graph API (stub)
@@ -76,14 +77,23 @@ The marketing site, dashboard pages and Create-Series wizard run with zero env
 vars. To use the **`/studio` live playground** (script → image → voice with
 your own keys) set the three required env vars below.
 
-### Required env vars (for `/studio`)
+### Required env vars (for the `/studio` pipeline to actually produce videos)
 
 | Variable | Provider | Used for |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | [Anthropic](https://console.anthropic.com) | Script writing (Claude Sonnet 4.6) |
-| `OPENAI_API_KEY` | [OpenAI](https://platform.openai.com) | Image generation (`gpt-image-1`, 1024×1536) |
-| `ELEVENLABS_API_KEY` | [ElevenLabs](https://elevenlabs.io) | Voiceover (`eleven_multilingual_v2`) |
-| `ELEVENLABS_VOICE_ID` *(optional)* | ElevenLabs | Defaults to "Rachel" if unset |
+| `ANTHROPIC_API_KEY` | [Anthropic](https://console.anthropic.com) | Script writing **and** splitting your own pasted scripts into scenes (Claude Sonnet 4.6) |
+| `OPENAI_API_KEY` | [OpenAI](https://platform.openai.com) | Image generation (`gpt-image-1`, 1024×1536) **and** voiceover (`gpt-4o-mini-tts`, ~$0.015/min) |
+
+That's it for an end-to-end working app. Final MP4 composition runs in the
+user's browser via `ffmpeg.wasm` — no render-server cost, no extra API.
+
+### Optional env vars
+
+| Variable | Why you'd set it |
+|---|---|
+| `ELEVENLABS_API_KEY` | Premium narrator voice. Toggle "ElevenLabs" in the Studio voice dropdown. |
+| `ELEVENLABS_VOICE_ID` | Override the default ElevenLabs voice. |
+| `REPLICATE_API_TOKEN` | Swap images to Flux Schnell (~$0.003/img, 4× cheaper than OpenAI). |
 
 Add them in **Vercel → Project → Settings → Environment Variables**, then redeploy.
 
