@@ -77,25 +77,47 @@ The marketing site, dashboard pages and Create-Series wizard run with zero env
 vars. To use the **`/studio` live playground** (script → image → voice with
 your own keys) set the three required env vars below.
 
-### Required env vars (for the `/studio` pipeline to actually produce videos)
+### Tier 1 — required for the studio pipeline
+
+The studio works end-to-end with just these two:
 
 | Variable | Provider | Used for |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | [Anthropic](https://console.anthropic.com) | Script writing **and** splitting your own pasted scripts into scenes (Claude Sonnet 4.6) |
-| `OPENAI_API_KEY` | [OpenAI](https://platform.openai.com) | Image generation (`gpt-image-1`, 1024×1536) **and** voiceover (`gpt-4o-mini-tts`, ~$0.015/min) |
+| `ANTHROPIC_API_KEY` | [Anthropic](https://console.anthropic.com) | Script writing + splitting your pasted scripts into scenes (Claude Sonnet 4.6) |
+| `OPENAI_API_KEY` | [OpenAI](https://platform.openai.com) | Image generation (`gpt-image-1`) + voiceover (`gpt-4o-mini-tts`, ~$0.015/min) |
 
-That's it for an end-to-end working app. Final MP4 composition runs in the
-user's browser via `ffmpeg.wasm` — no render-server cost, no extra API.
+With only these set, you can compose and download finished MP4s — but they're
+not saved anywhere; you just download them.
 
-### Optional env vars
+### Tier 2 — required to save videos to your library
+
+| Variable | Provider | Used for |
+|---|---|---|
+| `DATABASE_URL` | Vercel Postgres / Neon | Stores users, series, videos |
+| `AUTH_SECRET` | self (`openssl rand -base64 32`) | NextAuth JWT signing |
+| `GOOGLE_CLIENT_ID` | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) | Sign in with Google |
+| `GOOGLE_CLIENT_SECRET` | same | same |
+| `BLOB_READ_WRITE_TOKEN` | Vercel Blob (auto-set by Vercel when enabled) | Stores finished MP4s |
+
+If any of Tier 2 is missing, the app degrades gracefully — sign-in falls through
+to anonymous mode and "save to library" politely says "set up the DB to save".
+
+### Tier 3 — optional upgrades
 
 | Variable | Why you'd set it |
 |---|---|
-| `ELEVENLABS_API_KEY` | Premium narrator voice. Toggle "ElevenLabs" in the Studio voice dropdown. |
-| `ELEVENLABS_VOICE_ID` | Override the default ElevenLabs voice. |
+| `ELEVENLABS_API_KEY` | Premium narrator voice. Toggle "ElevenLabs" in the studio voice dropdown. |
 | `REPLICATE_API_TOKEN` | Swap images to Flux Schnell (~$0.003/img, 4× cheaper than OpenAI). |
 
-Add them in **Vercel → Project → Settings → Environment Variables**, then redeploy.
+### Vercel deploy walkthrough
+
+1. **Import the repo** at https://vercel.com/new → branch `claude/clone-facelessreels-site-aEYUr` (or `main` after merging).
+2. **Storage → Create Database → Postgres** (free tier). Vercel auto-injects `DATABASE_URL`, `POSTGRES_URL` etc.
+3. **Storage → Create Blob Store**. Vercel auto-injects `BLOB_READ_WRITE_TOKEN`.
+4. **Settings → Environment Variables**: add `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`.
+5. **Google Cloud Console** → OAuth consent screen + Credentials → add the redirect URI `https://<your-domain>.vercel.app/api/auth/callback/google`.
+6. **Push migrations**: from your laptop, `DATABASE_URL=… npx prisma db push` (or wire it into Vercel's deploy command).
+7. **Redeploy**. Done.
 
 The app is **free during open beta** — no Stripe, no paywall, no subscription
 gating. You only pay your AI providers for what you actually generate.

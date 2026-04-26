@@ -1,9 +1,17 @@
 import Link from "next/link";
 import { Logo } from "@/components/marketing/Logo";
+import { authEnabled, signIn } from "@/auth";
+import { redirect } from "next/navigation";
 
 export const metadata = { title: "Log in — ReelForge" };
 
 export default function LoginPage() {
+  async function googleSignIn() {
+    "use server";
+    if (!authEnabled) redirect("/dashboard");
+    await signIn("google", { redirectTo: "/dashboard" });
+  }
+
   return (
     <main className="min-h-screen grid md:grid-cols-2">
       <div className="px-6 py-10 flex flex-col">
@@ -11,38 +19,23 @@ export default function LoginPage() {
         <div className="my-auto max-w-sm w-full mx-auto">
           <h1 className="font-display text-3xl font-bold">Welcome back.</h1>
           <p className="mt-2 text-ink-dim text-sm">
-            Sign in to keep your faceless channels posting.
+            Sign in to keep your library in sync.
           </p>
-          <form action="/dashboard" className="mt-8 space-y-3">
+          <form action={googleSignIn} className="mt-8 space-y-3">
             <button
-              type="button"
-              className="w-full btn-ghost justify-center"
+              type="submit"
+              className="w-full btn-brand justify-center"
             >
               <span className="w-4 h-4 rounded-sm bg-white" /> Continue with Google
             </button>
-            <div className="flex items-center gap-3 my-4">
-              <div className="h-px flex-1 bg-line" />
-              <span className="text-xs text-ink-mute">or with email</span>
-              <div className="h-px flex-1 bg-line" />
-            </div>
-            <input
-              name="email"
-              type="email"
-              required
-              placeholder="you@channel.com"
-              className="w-full bg-bg-elev border border-line rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-brand"
-            />
-            <input
-              name="password"
-              type="password"
-              required
-              placeholder="Password"
-              className="w-full bg-bg-elev border border-line rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-brand"
-            />
-            <button type="submit" className="w-full btn-brand justify-center">
-              Log in
-            </button>
           </form>
+          {!authEnabled && (
+            <p className="mt-4 text-xs text-ink-mute">
+              Accounts aren&rsquo;t configured yet. The button takes you straight to the dashboard.
+              Set <code className="font-mono">AUTH_SECRET</code>, <code className="font-mono">GOOGLE_CLIENT_ID</code>,{" "}
+              <code className="font-mono">GOOGLE_CLIENT_SECRET</code> and <code className="font-mono">DATABASE_URL</code> in Vercel to enable accounts.
+            </p>
+          )}
           <p className="mt-6 text-sm text-ink-dim text-center">
             New here?{" "}
             <Link href="/signup" className="text-brand hover:underline">
@@ -61,15 +54,15 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-grid-faint [background-size:42px_42px] [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_75%)]" />
         <div className="relative h-full grid place-items-center p-10">
           <div className="card p-6 max-w-sm w-full">
-            <div className="text-xs font-mono text-brand">▶ live status</div>
+            <div className="text-xs font-mono text-brand">▶ live</div>
             <p className="mt-2 font-display text-xl">
-              ReelForge has shipped <span className="text-brand">1,284</span> faceless
-              videos in the last 24h.
+              Open the studio. Bring your own AI keys. Compose reels in your browser.
             </p>
             <ul className="mt-5 space-y-3 text-sm text-ink-dim">
-              <li>• 412 to TikTok</li>
-              <li>• 521 to Instagram Reels</li>
-              <li>• 351 to YouTube Shorts</li>
+              <li>• Claude writes the script</li>
+              <li>• OpenAI generates 9:16 visuals</li>
+              <li>• OpenAI TTS voices it</li>
+              <li>• Browser renders the MP4</li>
             </ul>
           </div>
         </div>

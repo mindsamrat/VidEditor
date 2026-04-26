@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { upload } from "@vercel/blob/client";
 import { Logo } from "@/components/marketing/Logo";
 import { composeVideo, type ComposeProgress } from "@/lib/composeVideo";
 
@@ -46,6 +47,8 @@ export default function StudioPage() {
   const [composeProgress, setComposeProgress] = useState<ComposeProgress | null>(null);
   const [composeError, setComposeError] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [savedToLibrary, setSavedToLibrary] = useState<{ saved: boolean; reason?: string; id?: string } | null>(null);
+  const [savingToLibrary, setSavingToLibrary] = useState(false);
 
   // ── Step 1: write or split script
   async function generateScript() {
@@ -141,6 +144,7 @@ export default function StudioPage() {
     if (!script) return;
     setComposeError(null);
     setVideoUrl(null);
+    setSavedToLibrary(null);
     try {
       if (script.scenes.some((s) => !s.imageDataUrl || !s.audioDataUrl)) {
         throw new Error("Every scene needs an image and an audio clip first.");
@@ -153,8 +157,47 @@ export default function StudioPage() {
         setComposeProgress
       );
       setVideoUrl(URL.createObjectURL(blob));
+      // Fire-and-forget: upload to Vercel Blob + save DB row if accounts are
+      // configured. Local download still works either way.
+      saveComposedVideo(blob).catch(() => {});
     } catch (e: unknown) {
       setComposeError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function saveComposedVideo(blob: Blob) {
+    if (!script) return;
+    setSavingToLibrary(true);
+    try {
+      const filename = `reel-${Date.now()}.mp4`;
+      const uploaded = await upload(filename, blob, {
+        access: "public",
+        handleUploadUrl: "/api/upload",
+        contentType: "video/mp4",
+      });
+      const r = await fetch("/api/videos/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: script.title,
+          hook: script.hook,
+          videoUrl: uploaded.url,
+          scenes: script.scenes.map((s) => ({
+            voiceover: s.voiceover,
+            image_prompt: s.image_prompt,
+            on_screen_text: s.on_screen_text,
+          })),
+        }),
+      });
+      const data = await r.json();
+      setSavedToLibrary({ saved: !!data.saved, reason: data.reason, id: data.video?.id });
+    } catch (e) {
+      setSavedToLibrary({
+        saved: false,
+        reason: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setSavingToLibrary(false);
     }
   }
 
@@ -359,8 +402,7 @@ export default function StudioPage() {
                   <video src={videoUrl} controls className="w-full rounded-xl border border-line" />
                   <div className="flex flex-col justify-center gap-3">
                     <p className="text-sm text-ink-dim">
-                      Your reel is ready. Download it and post wherever — or keep generating
-                      variations.
+                      Your reel is ready. Download it below — or open the library if you saved it.
                     </p>
                     <a
                       href={videoUrl}
@@ -369,6 +411,20 @@ export default function StudioPage() {
                     >
                       ⬇ Download MP4
                     </a>
+                    {savingToLibrary && (
+                      <p className="text-xs text-ink-mute">Saving to your library…</p>
+                    )}
+                    {savedToLibrary?.saved && (
+                      <p className="text-xs text-brand">
+                        ✓ Saved to library.{" "}
+                        <Link href="/dashboard/library" className="underline">Open library</Link>
+                      </p>
+                    )}
+                    {savedToLibrary && !savedToLibrary.saved && savedToLibrary.reason && (
+                      <p className="text-xs text-ink-mute">
+                        Not saved: {savedToLibrary.reason}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}

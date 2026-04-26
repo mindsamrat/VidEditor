@@ -1,9 +1,17 @@
 import Link from "next/link";
 import { Logo } from "@/components/marketing/Logo";
+import { authEnabled, signIn } from "@/auth";
+import { redirect } from "next/navigation";
 
 export const metadata = { title: "Create account — ReelForge" };
 
 export default function SignupPage() {
+  async function googleSignIn() {
+    "use server";
+    if (!authEnabled) redirect("/studio");
+    await signIn("google", { redirectTo: "/studio" });
+  }
+
   return (
     <main className="min-h-screen grid md:grid-cols-2">
       <div className="px-6 py-10 flex flex-col">
@@ -13,39 +21,16 @@ export default function SignupPage() {
           <p className="mt-2 text-ink-dim text-sm">
             Free during open beta. Bring your own AI keys.
           </p>
-          <form action="/dashboard/create" className="mt-8 space-y-3">
-            <button type="button" className="w-full btn-ghost justify-center">
+          <form action={googleSignIn} className="mt-8 space-y-3">
+            <button type="submit" className="w-full btn-brand justify-center">
               <span className="w-4 h-4 rounded-sm bg-white" /> Continue with Google
             </button>
-            <div className="flex items-center gap-3 my-4">
-              <div className="h-px flex-1 bg-line" />
-              <span className="text-xs text-ink-mute">or with email</span>
-              <div className="h-px flex-1 bg-line" />
-            </div>
-            <input
-              name="name"
-              required
-              placeholder="Your name"
-              className="w-full bg-bg-elev border border-line rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-brand"
-            />
-            <input
-              name="email"
-              type="email"
-              required
-              placeholder="you@channel.com"
-              className="w-full bg-bg-elev border border-line rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-brand"
-            />
-            <input
-              name="password"
-              type="password"
-              required
-              placeholder="Pick a password"
-              className="w-full bg-bg-elev border border-line rounded-lg px-4 py-3 text-sm focus:outline-none focus:border-brand"
-            />
-            <button type="submit" className="w-full btn-brand justify-center">
-              Create account
-            </button>
           </form>
+          {!authEnabled && (
+            <p className="mt-4 text-xs text-ink-mute">
+              Accounts aren&rsquo;t configured yet — this takes you straight to the studio.
+            </p>
+          )}
           <p className="mt-6 text-sm text-ink-dim text-center">
             Already have one?{" "}
             <Link href="/login" className="text-brand hover:underline">
@@ -65,11 +50,11 @@ export default function SignupPage() {
           <div className="card p-6 max-w-sm w-full">
             <h2 className="font-display text-lg">What you get out of the box</h2>
             <ul className="mt-4 space-y-3 text-sm text-ink-dim">
-              <li>✓ AI scripts tuned for hook-retention curves</li>
-              <li>✓ 10 art styles, 6 voices, royalty-free music</li>
-              <li>✓ Native posting to TikTok / IG / YT</li>
-              <li>✓ Series engine — set it once, ship forever</li>
-              <li>✓ Cancel any time</li>
+              <li>✓ Generate the script or paste your own</li>
+              <li>✓ 9:16 visuals via OpenAI gpt-image-1</li>
+              <li>✓ Voiceover via OpenAI TTS (cheapest)</li>
+              <li>✓ Final MP4 composed in your browser</li>
+              <li>✓ Library + downloads (when DB is on)</li>
             </ul>
           </div>
         </div>
