@@ -2,33 +2,66 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  color: #E5E7EB;
-  background: #0A0A0F;
+:root {
+  color-scheme: dark;
 }
 
-/* Custom scrollbar */
+html,
+body {
+  background: #07090C;
+  color: #E8ECEF;
+}
+
+::selection {
+  background: rgba(52, 211, 153, 0.35);
+  color: #ffffff;
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #0A0A0F;
+  background: #07090C;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1E1E2E;
-  border-radius: 3px;
+  background: #1B2230;
+  border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #2E2E3E;
+  background: #2A3344;
 }
 
-/* Skeleton shimmer animation */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
-.skeleton-shimmer {
-  background: linear-gradient(90deg, #141420 25%, #1E1E2E 50%, #141420 75%);
+.skeleton {
+  background: linear-gradient(90deg, #0E1218 25%, #1B2230 50%, #0E1218 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
+  animation: shimmer 1.6s infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.float-slow { animation: float 6s ease-in-out infinite; }
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee-track { animation: marquee 30s linear infinite; }
+
+.text-balance { text-wrap: balance; }
+
+.btn-brand {
+  @apply inline-flex items-center justify-center gap-2 rounded-full bg-brand text-bg font-semibold px-5 py-3 hover:bg-brand-hi transition shadow-glow;
+}
+.btn-ghost {
+  @apply inline-flex items-center justify-center gap-2 rounded-full border border-line text-ink px-5 py-3 hover:border-ink/40 hover:bg-bg-elev transition;
+}
+.card {
+  @apply bg-bg-elev border border-line rounded-2xl shadow-card;
 }
