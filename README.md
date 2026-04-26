@@ -35,21 +35,21 @@ src/
 │  │  ├─ library/page.tsx           # All generated videos with status
 │  │  ├─ calendar/page.tsx          # Weekly posting calendar
 │  │  ├─ accounts/page.tsx          # Connected social accounts
-│  │  ├─ billing/page.tsx           # Plan + usage meters + invoices
+│  │  ├─ billing/page.tsx           # Open-beta status + bring-your-own-key panel
 │  │  └─ settings/page.tsx          # Profile, notifications, brand kit, danger zone
+│  ├─ studio/page.tsx               # ★ Live playground — test script + image + voice with your keys
 │  └─ api/
-│     ├─ auth/[...nextauth]/        # NextAuth handler
-│     ├─ connect/[platform]/        # Social OAuth connect
-│     ├─ series/                    # Series CRUD
-│     ├─ videos/                    # List videos
-│     ├─ generate/script/           # Claude / GPT — script writer
-│     ├─ generate/image/            # Replicate / fal — visuals
-│     ├─ generate/voice/            # ElevenLabs / OpenAI TTS
-│     ├─ generate/render/           # Remotion / Shotstack / Creatomate
-│     ├─ post/tiktok/               # TikTok Content Posting API
-│     ├─ post/instagram/            # Instagram Graph API
-│     ├─ post/youtube/              # YouTube Data API v3
-│     └─ stripe/{checkout,webhook}/ # Billing
+│     ├─ auth/[...nextauth]/        # NextAuth handler (stub)
+│     ├─ connect/[platform]/        # Social OAuth connect (stub)
+│     ├─ series/                    # Series CRUD (stub)
+│     ├─ videos/                    # List videos (stub)
+│     ├─ generate/script/           # Claude — script writer (LIVE)
+│     ├─ generate/image/            # OpenAI gpt-image-1 — visuals (LIVE)
+│     ├─ generate/voice/            # ElevenLabs — voiceover (LIVE)
+│     ├─ generate/render/           # Remotion / Shotstack / Creatomate (stub)
+│     ├─ post/tiktok/               # TikTok Content Posting API (stub)
+│     ├─ post/instagram/            # Instagram Graph API (stub)
+│     └─ post/youtube/              # YouTube Data API v3 (stub)
 ├─ components/
 │  ├─ marketing/  (Navbar, Footer, Hero, LogoCloud, HowItWorks, Features, Niches, Showcase, Pricing, Testimonials, FAQ, CTA, Logo)
 │  └─ dashboard/  (Sidebar, TopBar)
@@ -72,8 +72,23 @@ npm run dev
 # open http://localhost:3000
 ```
 
-Builds with zero env vars (everything is mocked / stubbed). To wire it to real
-services, fill in `.env.example` and replace the stubs in `src/app/api/`.
+The marketing site, dashboard pages and Create-Series wizard run with zero env
+vars. To use the **`/studio` live playground** (script → image → voice with
+your own keys) set the three required env vars below.
+
+### Required env vars (for `/studio`)
+
+| Variable | Provider | Used for |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | [Anthropic](https://console.anthropic.com) | Script writing (Claude Sonnet 4.6) |
+| `OPENAI_API_KEY` | [OpenAI](https://platform.openai.com) | Image generation (`gpt-image-1`, 1024×1536) |
+| `ELEVENLABS_API_KEY` | [ElevenLabs](https://elevenlabs.io) | Voiceover (`eleven_multilingual_v2`) |
+| `ELEVENLABS_VOICE_ID` *(optional)* | ElevenLabs | Defaults to "Rachel" if unset |
+
+Add them in **Vercel → Project → Settings → Environment Variables**, then redeploy.
+
+The app is **free during open beta** — no Stripe, no paywall, no subscription
+gating. You only pay your AI providers for what you actually generate.
 
 ---
 

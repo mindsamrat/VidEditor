@@ -22,9 +22,9 @@ export default function DashboardOverview() {
       <TopBar title="Overview" subtitle="Your faceless empire at a glance" />
       <main className="p-6 space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Stat label="Videos this month" value="74" hint="of 120" />
+          <Stat label="Videos this month" value="74" hint="unlimited (BYO keys)" />
           <Stat label="Total views (30d)" value="4.6M" hint="+12% vs last 30d" trend="up" />
-          <Stat label="Active series" value="3" hint="of 5 included" />
+          <Stat label="Active series" value="3" hint="unlimited" />
           <Stat label="Connected accounts" value="5" hint="TT · IG · YT × 2" />
         </div>
 

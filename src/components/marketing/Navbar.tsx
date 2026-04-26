@@ -8,6 +8,7 @@ const NAV = [
   { href: "/#how", label: "How it works" },
   { href: "/#niches", label: "Niches" },
   { href: "/#features", label: "Features" },
+  { href: "/studio", label: "Studio" },
   { href: "/pricing", label: "Pricing" },
   { href: "/faq", label: "FAQ" },
 ];
@@ -31,7 +32,7 @@ export function Navbar() {
             Log in
           </Link>
           <Link href="/signup" className="btn-brand text-sm py-2.5 px-4">
-            Start for $19
+            Start free
           </Link>
         </div>
         <button

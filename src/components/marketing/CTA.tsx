@@ -15,10 +15,10 @@ export function CTA() {
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link href="/signup" className="btn-brand">
-              Start for $19 →
+              Start free →
             </Link>
-            <Link href="/pricing" className="btn-ghost">
-              See all plans
+            <Link href="/studio" className="btn-ghost">
+              Open the studio
             </Link>
           </div>
         </div>

@@ -7,10 +7,11 @@ import { Logo } from "@/components/marketing/Logo";
 const NAV = [
   { href: "/dashboard", label: "Overview", icon: "grid" },
   { href: "/dashboard/series", label: "Series", icon: "stack" },
+  { href: "/studio", label: "Studio · live", icon: "spark" },
   { href: "/dashboard/library", label: "Library", icon: "film" },
   { href: "/dashboard/calendar", label: "Calendar", icon: "calendar" },
   { href: "/dashboard/accounts", label: "Connected accounts", icon: "link" },
-  { href: "/dashboard/billing", label: "Billing", icon: "card" },
+  { href: "/dashboard/billing", label: "Plan & keys", icon: "card" },
   { href: "/dashboard/settings", label: "Settings", icon: "cog" },
 ];
 
@@ -50,16 +51,15 @@ export function Sidebar() {
       </nav>
       <div className="mt-auto p-4">
         <div className="card p-4">
-          <p className="text-xs text-ink-mute">Plan</p>
-          <p className="text-sm font-medium">Creator</p>
-          <div className="mt-3 h-1.5 rounded-full bg-bg overflow-hidden">
-            <div className="h-full bg-brand" style={{ width: "62%" }} />
-          </div>
-          <p className="mt-2 text-[11px] text-ink-mute">
-            74 / 120 videos used this month
+          <span className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest bg-brand/10 text-brand px-2 py-0.5 rounded-full">
+            <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
+            Open beta
+          </span>
+          <p className="mt-2 text-xs text-ink-dim">
+            Free. You bring your own AI keys.
           </p>
           <Link href="/dashboard/billing" className="mt-3 block text-xs text-brand hover:underline">
-            Upgrade →
+            Manage keys →
           </Link>
         </div>
       </div>
@@ -82,6 +82,8 @@ function Icon({ name, active }: { name: string; active: boolean }) {
       return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 1 0-7-7l-1 1" /><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 1 0 7 7l1-1" /></svg>;
     case "card":
       return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /></svg>;
+    case "spark":
+      return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" /></svg>;
     case "cog":
       return <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1A2 2 0 1 1 4.4 17l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1A2 2 0 1 1 7 4.4l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>;
     default:

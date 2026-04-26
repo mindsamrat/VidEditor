@@ -11,7 +11,7 @@ export default function SignupPage() {
         <div className="my-auto max-w-sm w-full mx-auto">
           <h1 className="font-display text-3xl font-bold">Spin up your faceless channel.</h1>
           <p className="mt-2 text-ink-dim text-sm">
-            5 minutes to first auto-posted reel. 7-day money-back.
+            Free during open beta. Bring your own AI keys.
           </p>
           <form action="/dashboard/create" className="mt-8 space-y-3">
             <button type="button" className="w-full btn-ghost justify-center">

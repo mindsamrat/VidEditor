@@ -30,7 +30,7 @@ export function Hero() {
             </Link>
           </div>
           <p className="mt-4 text-xs text-ink-mute">
-            Plans from $19/mo · Cancel anytime · 7-day money-back
+            Free during open beta · Bring your own AI keys · No credit card
           </p>
         </div>
 
