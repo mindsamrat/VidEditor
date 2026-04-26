@@ -1,7 +1,8 @@
 {
-  "name": "videditor-temp",
+  "name": "reelforge",
   "version": "0.1.0",
   "private": true,
+  "description": "ReelForge — AI faceless reels on auto-pilot. Pick a niche, the AI creates a series of videos and auto-posts to TikTok, Instagram and YouTube.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,19 +10,9 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.82.0",
-    "@dnd-kit/core": "^6.3.1",
-    "@dnd-kit/sortable": "^10.0.0",
-    "@dnd-kit/utilities": "^3.2.2",
-    "@ffmpeg/ffmpeg": "^0.12.15",
-    "@ffmpeg/util": "^0.12.2",
-    "framer-motion": "^12.38.0",
     "next": "14.2.35",
     "react": "^18",
-    "react-dom": "^18",
-    "replicate": "^1.4.0",
-    "wavesurfer.js": "^7.12.5",
-    "zustand": "^5.0.12"
+    "react-dom": "^18"
   },
   "devDependencies": {
     "@types/node": "^20",
