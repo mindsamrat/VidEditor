@@ -109,6 +109,60 @@ to anonymous mode and "save to library" politely says "set up the DB to save".
 | `ELEVENLABS_API_KEY` | Premium narrator voice. Toggle "ElevenLabs" in the studio voice dropdown. |
 | `REPLICATE_API_TOKEN` | Swap images to Flux Schnell (~$0.003/img, 4× cheaper than OpenAI). |
 
+---
+
+## Picking the right OpenAI voice
+
+The `/studio` voice dropdown defaults to `onyx` because it suits the most
+common faceless niches (mythology, true crime, history). Pick by content:
+
+| Voice | When to use |
+|---|---|
+| **Onyx** | Documentary · true crime · mythology · history. Deep, authoritative. |
+| **Ash** | Luxury · history · explainer. Warm baritone. |
+| **Echo** | News · tech · hype. Clear, articulate male. |
+| **Verse** | Motivation · stoic · sports. Dramatic male. |
+| **Fable** | Storytelling · fairy tales. British male. |
+| **Ballad** | ASMR-adjacent · reflective. Soft, expressive male. |
+| **Nova** | Explainer · lifestyle. Energetic female. |
+| **Sage** | Psychology · wellness. Calm, thoughtful female. |
+| **Coral** | Personal stories. Warm, expressive female. |
+| **Shimmer** | Calm / ASMR-adjacent. Soft female. |
+| **Alloy** | Neutral all-rounder. |
+
+OpenAI TTS pricing (`gpt-4o-mini-tts`): ~$0.015 per spoken minute. A 60-second
+reel costs ~$0.015. ElevenLabs at the same length is ~$0.18.
+
+---
+
+## Picking the right image model
+
+The `/studio` image route is wired to **OpenAI gpt-image-1** by default — easy
+because you already have the key. The quality dropdown picks the cost tier.
+
+| Model | Cost / 1024×1536 image | Quality (cinematic realism) | When to pick |
+|---|---|---|---|
+| OpenAI `gpt-image-1` low | ~$0.011 | OK — text on cards, simple subjects | Quick iteration |
+| **OpenAI `gpt-image-1` medium** *(default)* | **~$0.042** | **Strong photoreal, this is the sweet spot** | Most reels |
+| OpenAI `gpt-image-1` high | ~$0.167 | Excellent | Hero shots, premium niches |
+| Replicate **Flux Schnell** | ~$0.003 | Decent for stylised; weaker for photoreal humans | High-volume cheap factory |
+| Replicate **Flux Dev** | ~$0.025 | Strong, faster than gpt-image-1 medium | Volume + photoreal |
+| Replicate **Flux 1.1 Pro Ultra** | ~$0.05 | **Top-tier photoreal, our recommended cinematic realism choice** | Flagship channels |
+| fal.ai **Flux Pro** | ~$0.05 | Same as above, faster cold start | Same |
+| Google **Imagen 3** | ~$0.04 | Strong faces, slightly more "stock photo" feel | Lifestyle / luxury |
+
+**Cheapest decent option:** OpenAI `gpt-image-1` low at $0.011.
+**Best price/quality balance:** OpenAI `gpt-image-1` medium at $0.042.
+**Best cinematic realism:** Flux 1.1 Pro Ultra on Replicate at ~$0.05 — once you set `REPLICATE_API_TOKEN` in Vercel envs, ask me to wire the alternate image route and the studio dropdown will offer it.
+
+### Per-video cost (6-scene, ~60-second reel)
+
+| Stack | Cost |
+|---|---|
+| Cheapest (OpenAI low + OpenAI TTS) | ~$0.08 |
+| **Default (OpenAI medium + OpenAI TTS)** | **~$0.27** |
+| Premium (Flux Pro Ultra + ElevenLabs) | ~$0.48 |
+
 ### Vercel deploy walkthrough
 
 1. **Import the repo** at https://vercel.com/new → branch `claude/clone-facelessreels-site-aEYUr` (or `main` after merging).

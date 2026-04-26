@@ -5,6 +5,7 @@ import Link from "next/link";
 import { upload } from "@vercel/blob/client";
 import { Logo } from "@/components/marketing/Logo";
 import { composeVideo, type ComposeProgress } from "@/lib/composeVideo";
+import { STYLE_PACKS } from "@/lib/stylePacks";
 
 type Scene = {
   scene: number;
@@ -23,9 +24,24 @@ type Script = {
   title: string;
   hook: string;
   scenes: Scene[];
+  styleId?: string;
 };
 
 type Mode = "ai" | "byo";
+
+const OPENAI_VOICES: { id: string; label: string; vibe: string }[] = [
+  { id: "onyx", label: "Onyx", vibe: "Deep authoritative · documentary / true crime / mythology" },
+  { id: "ash", label: "Ash", vibe: "Warm baritone · history / luxury / explainer" },
+  { id: "echo", label: "Echo", vibe: "Clear articulate male · news / tech / hype" },
+  { id: "verse", label: "Verse", vibe: "Dramatic male · motivation / stoic / sports" },
+  { id: "fable", label: "Fable", vibe: "British male · storytelling / fairy tales" },
+  { id: "ballad", label: "Ballad", vibe: "Soft expressive male · ASMR / reflective" },
+  { id: "nova", label: "Nova", vibe: "Energetic female · explainer / lifestyle" },
+  { id: "sage", label: "Sage", vibe: "Calm thoughtful female · psychology / wellness" },
+  { id: "coral", label: "Coral", vibe: "Warm expressive female · personal stories" },
+  { id: "shimmer", label: "Shimmer", vibe: "Soft female · ASMR-adjacent / calm" },
+  { id: "alloy", label: "Alloy", vibe: "Neutral · all-rounder" },
+];
 
 export default function StudioPage() {
   // ── Setup form state
@@ -34,7 +50,8 @@ export default function StudioPage() {
   const [niche, setNiche] = useState("Mythology");
   const [voiceVibe, setVoiceVibe] = useState("deep documentary narrator");
   const [byoScript, setByoScript] = useState("");
-  const [imageQuality, setImageQuality] = useState<"low" | "medium" | "high">("low");
+  const [styleId, setStyleId] = useState("cinematic");
+  const [imageQuality, setImageQuality] = useState<"low" | "medium" | "high">("medium");
   const [voiceName, setVoiceName] = useState("onyx");
   const [voiceProvider, setVoiceProvider] = useState<"openai" | "elevenlabs">("openai");
   const [sceneCount, setSceneCount] = useState(6);
@@ -59,8 +76,8 @@ export default function StudioPage() {
     try {
       const endpoint = mode === "ai" ? "/api/generate/script" : "/api/generate/scenes";
       const body = mode === "ai"
-        ? { topic, niche, voice: voiceVibe, sceneCount }
-        : { script: byoScript, sceneCount };
+        ? { topic, niche, voice: voiceVibe, sceneCount, styleId }
+        : { script: byoScript, sceneCount, styleId };
       const r = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -85,7 +102,11 @@ export default function StudioPage() {
       const r = await fetch("/api/generate/image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: scene.image_prompt, quality: imageQuality }),
+        body: JSON.stringify({
+          prompt: scene.image_prompt,
+          styleId: script?.styleId || styleId,
+          quality: imageQuality,
+        }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
@@ -287,6 +308,37 @@ export default function StudioPage() {
             </div>
           )}
 
+          {/* Visual style — applies to every image in this reel */}
+          <div className="mt-6">
+            <p className="text-xs uppercase tracking-wider text-ink-mute mb-2">Visual style</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+              {STYLE_PACKS.map((s) => {
+                const active = styleId === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => setStyleId(s.id)}
+                    className={`text-left p-3 rounded-xl border transition ${
+                      active
+                        ? "border-brand bg-brand/5 shadow-glow"
+                        : "border-line bg-bg-elev2 hover:border-ink/30"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{s.label}</span>
+                      {s.flagship && (
+                        <span className="text-[9px] uppercase tracking-widest bg-brand/15 text-brand px-1.5 py-0.5 rounded">
+                          Flagship
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-ink-mute mt-0.5">{s.short}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <button
             onClick={generateScript}
             disabled={loadingScript || (mode === "byo" && byoScript.trim().length < 30)}
@@ -317,7 +369,7 @@ export default function StudioPage() {
                       className="bg-bg-elev2 border border-line rounded-md px-2 py-1 text-sm"
                     >
                       <option value="low">low (~$0.011)</option>
-                      <option value="medium">medium (~$0.042)</option>
+                      <option value="medium">medium (~$0.042) · default</option>
                       <option value="high">high (~$0.167)</option>
                     </select>
                   </label>
@@ -330,22 +382,21 @@ export default function StudioPage() {
                       }
                       className="bg-bg-elev2 border border-line rounded-md px-2 py-1 text-sm"
                     >
-                      <option value="openai">OpenAI (cheap)</option>
-                      <option value="elevenlabs">ElevenLabs</option>
+                      <option value="openai">OpenAI TTS (cheap)</option>
+                      <option value="elevenlabs">ElevenLabs (premium)</option>
                     </select>
                     {voiceProvider === "openai" && (
                       <select
                         value={voiceName}
                         onChange={(e) => setVoiceName(e.target.value)}
-                        className="bg-bg-elev2 border border-line rounded-md px-2 py-1 text-sm"
+                        className="bg-bg-elev2 border border-line rounded-md px-2 py-1 text-sm max-w-[280px]"
+                        title={OPENAI_VOICES.find((v) => v.id === voiceName)?.vibe}
                       >
-                        {["alloy", "echo", "fable", "onyx", "nova", "shimmer", "ash", "coral", "sage"].map(
-                          (v) => (
-                            <option key={v} value={v}>
-                              {v}
-                            </option>
-                          )
-                        )}
+                        {OPENAI_VOICES.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.label} — {v.vibe}
+                          </option>
+                        ))}
                       </select>
                     )}
                   </label>
