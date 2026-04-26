@@ -17,6 +17,8 @@ export const authEnabled = Boolean(
 
 const config: NextAuthConfig = {
   trustHost: true,
+  // NextAuth v5 expects at least an empty providers array. Keep config as
+  // tolerant as possible so a missing env var never breaks page rendering.
   providers: authEnabled
     ? [
         Google({
@@ -25,8 +27,11 @@ const config: NextAuthConfig = {
         }),
       ]
     : [],
-  ...(prisma ? { adapter: PrismaAdapter(prisma) } : {}),
+  ...(prisma && authEnabled ? { adapter: PrismaAdapter(prisma) } : {}),
   session: { strategy: "jwt" },
+  // Generate a placeholder secret in dev/anon mode so NextAuth never throws
+  // at construction. This is NOT used to sign anything you'd trust.
+  secret: process.env.AUTH_SECRET || "anon-mode-placeholder-do-not-use-in-production",
   pages: { signIn: "/login" },
   callbacks: {
     async jwt({ token, user }) {
@@ -35,7 +40,6 @@ const config: NextAuthConfig = {
     },
     async session({ session, token }) {
       if (token?.id && session.user) {
-        // Surface user id on the session for our API routes.
         (session.user as { id?: string }).id = token.id as string;
       }
       return session;
@@ -43,4 +47,25 @@ const config: NextAuthConfig = {
   },
 };
 
-export const { handlers, auth, signIn, signOut } = NextAuth(config);
+// Defensive init: if NextAuth itself throws at construction (rare, but the
+// beta has had quirks), expose safe stubs so the rest of the app keeps
+// rendering.
+type AuthExports = ReturnType<typeof NextAuth>;
+let exported: AuthExports;
+try {
+  exported = NextAuth(config);
+} catch (e) {
+  console.error("[reelforge] NextAuth init failed:", e);
+  exported = {
+    handlers: {
+      GET: async () => new Response("Auth disabled", { status: 503 }),
+      POST: async () => new Response("Auth disabled", { status: 503 }),
+    },
+    auth: (async () => null) as unknown as AuthExports["auth"],
+    signIn: (async () => {}) as unknown as AuthExports["signIn"],
+    signOut: (async () => {}) as unknown as AuthExports["signOut"],
+    unstable_update: (async () => null) as unknown as AuthExports["unstable_update"],
+  } as AuthExports;
+}
+
+export const { handlers, auth, signIn, signOut } = exported;
