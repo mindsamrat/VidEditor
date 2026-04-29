@@ -162,6 +162,47 @@ because you already have the key. The quality dropdown picks the cost tier.
 | Cheapest (OpenAI low + OpenAI TTS) | ~$0.08 |
 | **Default (OpenAI medium + OpenAI TTS)** | **~$0.27** |
 | Premium (Flux Pro Ultra + ElevenLabs) | ~$0.48 |
+| BYO audio (no TTS) — just adds Whisper at ~$0.006/min | ~$0.26 |
+
+---
+
+## Three input modes in the Studio
+
+The studio's Step 1 has a three-way toggle:
+
+### 1. "Write it for me"
+Claude writes the script + image prompts from a topic. We then TTS each scene
+with OpenAI and compose per-scene clips into the final MP4.
+
+### 2. "Paste my script"
+You paste a script verbatim. Claude only splits it into scenes + adds image
+prompts — never rewrites your words. TTS + compose same as above.
+
+### 3. "Upload my audio" (NEW)
+You upload an MP3 / WAV / M4A / WEBM. Pipeline:
+
+1. **Whisper transcribes** the audio at word-level timestamps. We also
+   detect silence gaps > 0.3s — those are the natural beats.
+2. **Claude plans scenes** that align to those beats (sentence ends,
+   pauses, topic shifts) — never cuts mid-sentence. Each scene gets a
+   start/end second + a cinematic image prompt.
+3. **You generate images** as before — gpt-image-1 in your chosen style.
+4. **Compose** uses the timeline mode of `ffmpeg.wasm`: each image is held
+   for its scene's duration, then everything is muxed under your original
+   audio track.
+
+Limits:
+- The Vercel serverless body limit is ~4.5 MB (≈3-4 minutes of MP3 at
+  128 kbps). For longer files we'd switch the upload to Vercel Blob and
+  pass the Blob URL to Whisper — small follow-up if you need it.
+- Whisper costs $0.006 per minute of audio.
+
+### What this unlocks
+- Use your own voice (record on your phone, upload).
+- Use a podcast clip, a movie monologue you have rights to, or a generated
+  voice from another tool.
+- Match scene cuts to actual emotional beats in the speech, not just
+  evenly-spaced timestamps.
 
 ### Vercel deploy walkthrough
 

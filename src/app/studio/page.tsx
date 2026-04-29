@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { upload } from "@vercel/blob/client";
 import { Logo } from "@/components/marketing/Logo";
-import { composeVideo, type ComposeProgress } from "@/lib/composeVideo";
+import { composeVideo, composeVideoTimeline, type ComposeProgress } from "@/lib/composeVideo";
 import { STYLE_PACKS } from "@/lib/stylePacks";
 
 type Scene = {
@@ -12,12 +12,16 @@ type Scene = {
   voiceover: string;
   image_prompt: string;
   on_screen_text: string;
-  imageDataUrl?: string;
-  imageError?: string;
-  imageLoading?: boolean;
+  // Per-scene audio (TTS path) — present in "ai" / "byo-script" modes.
   audioDataUrl?: string;
   audioError?: string;
   audioLoading?: boolean;
+  // Timeline audio (BYO-audio mode) — these are filled instead.
+  startSec?: number;
+  endSec?: number;
+  imageDataUrl?: string;
+  imageError?: string;
+  imageLoading?: boolean;
 };
 
 type Script = {
@@ -27,7 +31,7 @@ type Script = {
   styleId?: string;
 };
 
-type Mode = "ai" | "byo";
+type Mode = "ai" | "byo-script" | "byo-audio";
 
 const OPENAI_VOICES: { id: string; label: string; vibe: string }[] = [
   { id: "onyx", label: "Onyx", vibe: "Deep authoritative · documentary / true crime / mythology" },
@@ -56,6 +60,20 @@ export default function StudioPage() {
   const [voiceProvider, setVoiceProvider] = useState<"openai" | "elevenlabs">("openai");
   const [sceneCount, setSceneCount] = useState(6);
 
+  // BYO-audio state
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [masterAudioDataUrl, setMasterAudioDataUrl] = useState<string | null>(null);
+  const [transcription, setTranscription] = useState<{
+    text: string;
+    duration: number;
+    language: string;
+    gaps: { at: number; durationSec: number }[];
+    words: { word: string; start: number; end: number }[];
+    segments: { text: string; start: number; end: number }[];
+  } | null>(null);
+  const [transcribing, setTranscribing] = useState(false);
+  const [transcribeError, setTranscribeError] = useState<string | null>(null);
+
   // ── Pipeline state
   const [script, setScript] = useState<Script | null>(null);
   const [scriptError, setScriptError] = useState<string | null>(null);
@@ -67,7 +85,7 @@ export default function StudioPage() {
   const [savedToLibrary, setSavedToLibrary] = useState<{ saved: boolean; reason?: string; id?: string } | null>(null);
   const [savingToLibrary, setSavingToLibrary] = useState(false);
 
-  // ── Step 1: write or split script
+  // ── Step 1A: write or split a text script (modes "ai" / "byo-script")
   async function generateScript() {
     setLoadingScript(true);
     setScript(null);
@@ -90,6 +108,61 @@ export default function StudioPage() {
       setScriptError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoadingScript(false);
+    }
+  }
+
+  // ── Step 1B: transcribe uploaded audio (mode "byo-audio")
+  async function onAudioFile(file: File | null) {
+    setAudioFile(file);
+    setTranscription(null);
+    setTranscribeError(null);
+    setMasterAudioDataUrl(null);
+    setScript(null);
+    if (!file) return;
+    // Read file as data URL so we can stash it for the eventual compose call.
+    await new Promise<void>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setMasterAudioDataUrl(reader.result as string);
+        resolve();
+      };
+      reader.onerror = () => resolve();
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function transcribeAndPlan() {
+    if (!audioFile) return;
+    setTranscribing(true);
+    setTranscribeError(null);
+    setScript(null);
+    try {
+      const fd = new FormData();
+      fd.append("audio", audioFile);
+      const r = await fetch("/api/transcribe", { method: "POST", body: fd });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
+      setTranscription(data);
+
+      // Now ask Claude to split into beat-aligned scenes.
+      const r2 = await fetch("/api/generate/scenes-from-audio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          words: data.words,
+          segments: data.segments,
+          gaps: data.gaps,
+          sceneCount,
+          styleId,
+        }),
+      });
+      const plan = await r2.json();
+      if (!r2.ok) throw new Error(plan.error || `HTTP ${r2.status}`);
+      setScript(plan);
+    } catch (e: unknown) {
+      setTranscribeError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setTranscribing(false);
     }
   }
 
@@ -167,19 +240,39 @@ export default function StudioPage() {
     setVideoUrl(null);
     setSavedToLibrary(null);
     try {
-      if (script.scenes.some((s) => !s.imageDataUrl || !s.audioDataUrl)) {
-        throw new Error("Every scene needs an image and an audio clip first.");
+      if (script.scenes.some((s) => !s.imageDataUrl)) {
+        throw new Error("Every scene needs an image first.");
       }
-      const blob = await composeVideo(
-        script.scenes.map((s) => ({
-          imageDataUrl: s.imageDataUrl!,
-          audioDataUrl: s.audioDataUrl!,
-        })),
-        setComposeProgress
-      );
+      let blob: Blob;
+      if (mode === "byo-audio") {
+        if (!masterAudioDataUrl) throw new Error("Upload your audio first.");
+        if (script.scenes.some((s) => s.startSec == null || s.endSec == null)) {
+          throw new Error("Scene timing is missing. Re-run 'Plan scenes from audio'.");
+        }
+        blob = await composeVideoTimeline(
+          {
+            audioDataUrl: masterAudioDataUrl,
+            scenes: script.scenes.map((s) => ({
+              imageDataUrl: s.imageDataUrl!,
+              startSec: s.startSec!,
+              endSec: s.endSec!,
+            })),
+          },
+          setComposeProgress
+        );
+      } else {
+        if (script.scenes.some((s) => !s.audioDataUrl)) {
+          throw new Error("Every scene needs an audio clip first.");
+        }
+        blob = await composeVideo(
+          script.scenes.map((s) => ({
+            imageDataUrl: s.imageDataUrl!,
+            audioDataUrl: s.audioDataUrl!,
+          })),
+          setComposeProgress
+        );
+      }
       setVideoUrl(URL.createObjectURL(blob));
-      // Fire-and-forget: upload to Vercel Blob + save DB row if accounts are
-      // configured. Local download still works either way.
       saveComposedVideo(blob).catch(() => {});
     } catch (e: unknown) {
       setComposeError(e instanceof Error ? e.message : String(e));
@@ -260,27 +353,26 @@ export default function StudioPage() {
         {/* ── Step 1: script source ───────────────────────────────────────── */}
         <section className="card p-6">
           <Step n={1} title="Script">
-            <div className="inline-flex p-1 rounded-full border border-line bg-bg-elev2 text-sm">
-              <button
-                onClick={() => setMode("ai")}
-                className={`px-4 py-1.5 rounded-full transition ${
-                  mode === "ai" ? "bg-brand text-bg" : "text-ink-dim"
-                }`}
-              >
-                Write it for me
-              </button>
-              <button
-                onClick={() => setMode("byo")}
-                className={`px-4 py-1.5 rounded-full transition ${
-                  mode === "byo" ? "bg-brand text-bg" : "text-ink-dim"
-                }`}
-              >
-                I&rsquo;ll paste my own
-              </button>
+            <div className="inline-flex flex-wrap p-1 rounded-full border border-line bg-bg-elev2 text-sm">
+              {[
+                { id: "ai" as Mode, label: "Write it for me" },
+                { id: "byo-script" as Mode, label: "Paste my script" },
+                { id: "byo-audio" as Mode, label: "Upload my audio" },
+              ].map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setMode(m.id)}
+                  className={`px-4 py-1.5 rounded-full transition ${
+                    mode === m.id ? "bg-brand text-bg" : "text-ink-dim"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
             </div>
           </Step>
 
-          {mode === "ai" ? (
+          {mode === "ai" && (
             <div className="grid sm:grid-cols-3 gap-3 mt-5">
               <Field label="Niche" value={niche} onChange={setNiche} />
               <Field label="Topic" value={topic} onChange={setTopic} className="sm:col-span-2" />
@@ -292,7 +384,9 @@ export default function StudioPage() {
               />
               <NumField label="Scenes" value={sceneCount} onChange={setSceneCount} min={3} max={8} />
             </div>
-          ) : (
+          )}
+
+          {mode === "byo-script" && (
             <div className="mt-5 space-y-3">
               <label className="block">
                 <span className="text-xs uppercase tracking-wider text-ink-mute">Your script</span>
@@ -305,6 +399,47 @@ export default function StudioPage() {
                 />
               </label>
               <NumField label="Scenes" value={sceneCount} onChange={setSceneCount} min={3} max={10} />
+            </div>
+          )}
+
+          {mode === "byo-audio" && (
+            <div className="mt-5 space-y-4">
+              <label className="block">
+                <span className="text-xs uppercase tracking-wider text-ink-mute">
+                  Your audio file (mp3, wav, m4a, webm — max ~4 MB)
+                </span>
+                <input
+                  type="file"
+                  accept="audio/*"
+                  onChange={(e) => onAudioFile(e.target.files?.[0] || null)}
+                  className="mt-2 block w-full text-sm text-ink-dim file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-brand file:text-bg file:font-medium hover:file:bg-brand-hi cursor-pointer"
+                />
+              </label>
+              {masterAudioDataUrl && (
+                <div className="card p-3 bg-bg-elev2">
+                  <p className="text-xs text-ink-mute mb-2">Preview</p>
+                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                  <audio src={masterAudioDataUrl} controls className="w-full" />
+                </div>
+              )}
+              <NumField label="Target scenes" value={sceneCount} onChange={setSceneCount} min={3} max={12} />
+              {transcription && (
+                <div className="card p-4 bg-bg-elev2">
+                  <div className="flex flex-wrap gap-3 text-xs text-ink-mute uppercase tracking-wider mb-3">
+                    <span>{transcription.duration.toFixed(1)}s</span>
+                    <span>·</span>
+                    <span>{transcription.language}</span>
+                    <span>·</span>
+                    <span>{transcription.words.length} words</span>
+                    <span>·</span>
+                    <span className="text-brand">{transcription.gaps.length} natural beats found</span>
+                  </div>
+                  <p className="text-sm text-ink-dim leading-relaxed line-clamp-4">
+                    {transcription.text}
+                  </p>
+                </div>
+              )}
+              {transcribeError && <p className="text-sm text-red-400">{transcribeError}</p>}
             </div>
           )}
 
@@ -340,15 +475,21 @@ export default function StudioPage() {
           </div>
 
           <button
-            onClick={generateScript}
-            disabled={loadingScript || (mode === "byo" && byoScript.trim().length < 30)}
+            onClick={mode === "byo-audio" ? transcribeAndPlan : generateScript}
+            disabled={
+              (mode === "byo-audio" && (!audioFile || transcribing)) ||
+              (mode === "byo-script" && byoScript.trim().length < 30) ||
+              loadingScript
+            }
             className="btn-brand text-sm mt-5 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loadingScript
-              ? "Working…"
-              : mode === "ai"
-                ? "Generate script"
-                : "Split into scenes"}
+            {mode === "byo-audio"
+              ? (transcribing ? "Transcribing + planning scenes…" : "Transcribe & plan scenes")
+              : loadingScript
+                ? "Working…"
+                : mode === "ai"
+                  ? "Generate script"
+                  : "Split into scenes"}
           </button>
           {scriptError && <p className="mt-3 text-sm text-red-400">{scriptError}</p>}
         </section>
@@ -373,33 +514,40 @@ export default function StudioPage() {
                       <option value="high">high (~$0.167)</option>
                     </select>
                   </label>
-                  <label className="flex items-center gap-2 text-xs">
-                    <span className="text-ink-mute uppercase tracking-wider">Voice</span>
-                    <select
-                      value={voiceProvider}
-                      onChange={(e) =>
-                        setVoiceProvider(e.target.value as "openai" | "elevenlabs")
-                      }
-                      className="bg-bg-elev2 border border-line rounded-md px-2 py-1 text-sm"
-                    >
-                      <option value="openai">OpenAI TTS (cheap)</option>
-                      <option value="elevenlabs">ElevenLabs (premium)</option>
-                    </select>
-                    {voiceProvider === "openai" && (
+                  {mode !== "byo-audio" && (
+                    <label className="flex items-center gap-2 text-xs">
+                      <span className="text-ink-mute uppercase tracking-wider">Voice</span>
                       <select
-                        value={voiceName}
-                        onChange={(e) => setVoiceName(e.target.value)}
-                        className="bg-bg-elev2 border border-line rounded-md px-2 py-1 text-sm max-w-[280px]"
-                        title={OPENAI_VOICES.find((v) => v.id === voiceName)?.vibe}
+                        value={voiceProvider}
+                        onChange={(e) =>
+                          setVoiceProvider(e.target.value as "openai" | "elevenlabs")
+                        }
+                        className="bg-bg-elev2 border border-line rounded-md px-2 py-1 text-sm"
                       >
-                        {OPENAI_VOICES.map((v) => (
-                          <option key={v.id} value={v.id}>
-                            {v.label} — {v.vibe}
-                          </option>
-                        ))}
+                        <option value="openai">OpenAI TTS (cheap)</option>
+                        <option value="elevenlabs">ElevenLabs (premium)</option>
                       </select>
-                    )}
-                  </label>
+                      {voiceProvider === "openai" && (
+                        <select
+                          value={voiceName}
+                          onChange={(e) => setVoiceName(e.target.value)}
+                          className="bg-bg-elev2 border border-line rounded-md px-2 py-1 text-sm max-w-[280px]"
+                          title={OPENAI_VOICES.find((v) => v.id === voiceName)?.vibe}
+                        >
+                          {OPENAI_VOICES.map((v) => (
+                            <option key={v.id} value={v.id}>
+                              {v.label} — {v.vibe}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </label>
+                  )}
+                  {mode === "byo-audio" && (
+                    <span className="text-xs text-ink-mute">
+                      Voice = your uploaded audio · timed to detected beats
+                    </span>
+                  )}
                 </div>
               </Step>
 
@@ -412,6 +560,7 @@ export default function StudioPage() {
                   <SceneCard
                     key={i}
                     s={s}
+                    showAudio={mode !== "byo-audio"}
                     onImage={() => generateImage(i)}
                     onAudio={() => generateAudio(i)}
                   />
@@ -422,9 +571,11 @@ export default function StudioPage() {
                 <button onClick={generateAllImages} className="btn-ghost text-sm">
                   Generate all images
                 </button>
-                <button onClick={generateAllAudio} className="btn-ghost text-sm">
-                  Voice all scenes
-                </button>
+                {mode !== "byo-audio" && (
+                  <button onClick={generateAllAudio} className="btn-ghost text-sm">
+                    Voice all scenes
+                  </button>
+                )}
               </div>
             </section>
 
@@ -564,13 +715,17 @@ function NumField({
 
 function SceneCard({
   s,
+  showAudio,
   onImage,
   onAudio,
 }: {
   s: Scene;
+  showAudio: boolean;
   onImage: () => void;
   onAudio: () => void;
 }) {
+  const hasTiming = typeof s.startSec === "number" && typeof s.endSec === "number";
+  const dur = hasTiming ? (s.endSec! - s.startSec!).toFixed(1) : null;
   return (
     <div className="rounded-xl border border-line bg-bg-elev2 p-3">
       <div className="aspect-[2/3] rounded-md bg-bg overflow-hidden grid place-items-center text-xs text-ink-mute relative">
@@ -587,24 +742,33 @@ function SceneCard({
           </button>
         )}
       </div>
-      <p className="mt-2 text-[11px] uppercase tracking-wider text-ink-mute">Scene {s.scene}</p>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <p className="text-[11px] uppercase tracking-wider text-ink-mute">Scene {s.scene}</p>
+        {hasTiming && (
+          <p className="text-[10px] font-mono text-brand">
+            {s.startSec!.toFixed(1)}s → {s.endSec!.toFixed(1)}s · {dur}s
+          </p>
+        )}
+      </div>
       <p className="text-sm text-ink mt-1">{s.voiceover}</p>
       <p className="text-[11px] text-ink-mute mt-2 italic">caption: &ldquo;{s.on_screen_text}&rdquo;</p>
 
-      <div className="mt-3">
-        {s.audioDataUrl ? (
-          // eslint-disable-next-line jsx-a11y/media-has-caption
-          <audio src={s.audioDataUrl} controls className="w-full h-9" />
-        ) : s.audioLoading ? (
-          <div className="skeleton h-9 w-full rounded-md" />
-        ) : s.audioError ? (
-          <p className="text-xs text-red-400">{s.audioError}</p>
-        ) : (
-          <button onClick={onAudio} className="text-xs text-brand hover:underline">
-            Voice this scene →
-          </button>
-        )}
-      </div>
+      {showAudio && (
+        <div className="mt-3">
+          {s.audioDataUrl ? (
+            // eslint-disable-next-line jsx-a11y/media-has-caption
+            <audio src={s.audioDataUrl} controls className="w-full h-9" />
+          ) : s.audioLoading ? (
+            <div className="skeleton h-9 w-full rounded-md" />
+          ) : s.audioError ? (
+            <p className="text-xs text-red-400">{s.audioError}</p>
+          ) : (
+            <button onClick={onAudio} className="text-xs text-brand hover:underline">
+              Voice this scene →
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
