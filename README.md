@@ -1,408 +1,51 @@
-# ReelForge
+# Channel Console
 
-**AI faceless reels on auto-pilot.** Pick a niche, the AI writes scripts,
-generates visuals, voices them, edits them, and posts to TikTok, Instagram and
-YouTube — every day, while you sleep.
+The control room for our YouTube channel. Live channel numbers, outlier tracking against our
+own baseline and our competitors', and the writing and editing tools from the
+[`yt-*` skills](.claude/skills), wired into one web app.
 
-A faithful, re-branded clone of the [facelessreels.com](https://facelessreels.com)
-mechanic. Built on **Next.js 14 (App Router) + TypeScript + Tailwind CSS**.
+**It's read-only.** The console reads public YouTube data with an API key. It can't upload,
+edit or post anything. Everything it writes ends in a block you copy, and we upload.
 
-> Branding only is changed (name, logo, colour palette). The product mechanic —
-> pick a niche → set a Series → AI generates and auto-posts to TikTok / IG / YT
-> on a schedule — is identical.
+## Pages
 
----
+| Page | What it does |
+| --- | --- |
+| **Overview** | Subscribers, views, upload rhythm, views per upload against our median (long-form and Shorts are kept separate), each video's multiple of that median, a title lint score and title formula, the outlier worth studying, and the weakest recent title. |
+| **Competitors** | Add channels, pull their last 30 uploads each, and rank every video by how far it beat *its own* channel's median. Shows which title formulas the outliers use. |
+| **Hook Lab** | Scores hooks on specificity, address, stakes, curiosity and brevity, ranks them, names the formula, and suggests a fix for the weakest property. Also browses the 21 formulas. |
+| **Packaging** | Lints each title and thumbnail-text pair for truncation, duplicated words, vagueness, missing numbers and all-caps. Includes a mock feed preview. |
+| **AI Desk** | Claude runs one of eight skills (script, package, SEO, Shorts, comments, plan, audit, retention), with our `voice.md` and a live channel snapshot as context. |
+| **Edit List** | Turns an SRT/VTT/Whisper transcript into an edit decision list: dead air, filler, retakes. Exports as text or CSV. |
+| **Chapters** | Finds chapter boundaries from pauses and topic shifts, checks them against YouTube's rules (starts at 0:00, at least 3, each at least 10s), and lets you retitle each line. |
+| **Retention** | Reads a Studio audience-retention CSV and reports the hook leak, the cliffs (with what was being said at each one, if you add a transcript) and the slide. |
+| **Week Plan** | One anchor, one cheap video, Shorts cut from the anchor. Checks the plan against the hours you actually have. |
+| **Voice** | The `voice.md` profile that every AI Desk mode reads. |
 
-## What's in this repo
+The scoring tools are TypeScript ports of the skills' Python scripts. They read the same
+`hooks.json` and give the same results on the same input.
 
-```
-src/
-├─ app/
-│  ├─ page.tsx                      # Marketing home (hero, niches, features, pricing, FAQ, testimonials, CTA)
-│  ├─ pricing/page.tsx              # Pricing + comparison table
-│  ├─ faq/page.tsx                  # FAQ
-│  ├─ login/page.tsx                # Sign-in
-│  ├─ signup/page.tsx               # Sign-up
-│  ├─ terms/page.tsx                # Terms of service
-│  ├─ privacy/page.tsx              # Privacy policy
-│  ├─ affiliate/page.tsx            # Affiliate program
-│  ├─ dashboard/
-│  │  ├─ layout.tsx                 # Sidebar shell
-│  │  ├─ page.tsx                   # Overview (stats, series table, queue, recent)
-│  │  ├─ create/page.tsx            # 7-step Create Series wizard (the core mechanic)
-│  │  ├─ series/page.tsx            # Series list
-│  │  ├─ series/[id]/page.tsx       # Series detail (queue, perf, danger zone)
-│  │  ├─ library/page.tsx           # All generated videos with status
-│  │  ├─ calendar/page.tsx          # Weekly posting calendar
-│  │  ├─ accounts/page.tsx          # Connected social accounts
-│  │  ├─ billing/page.tsx           # Open-beta status + bring-your-own-key panel
-│  │  └─ settings/page.tsx          # Profile, notifications, brand kit, danger zone
-│  ├─ studio/page.tsx               # ★ Live playground — test script + image + voice with your keys
-│  └─ api/
-│     ├─ auth/[...nextauth]/        # NextAuth handler (stub)
-│     ├─ connect/[platform]/        # Social OAuth connect (stub)
-│     ├─ series/                    # Series CRUD (stub)
-│     ├─ videos/                    # List videos (stub)
-│     ├─ generate/script/           # Claude — script writer (LIVE)
-│     ├─ generate/scenes/           # Claude — splits a user-provided script into scenes (LIVE)
-│     ├─ generate/image/            # OpenAI gpt-image-1 — visuals (LIVE)
-│     ├─ generate/voice/            # OpenAI TTS (default) / ElevenLabs (opt-in) (LIVE)
-│     ├─ generate/render/           # Remotion / Shotstack / Creatomate (stub)
-│     ├─ post/tiktok/               # TikTok Content Posting API (stub)
-│     ├─ post/instagram/            # Instagram Graph API (stub)
-│     └─ post/youtube/              # YouTube Data API v3 (stub)
-├─ components/
-│  ├─ marketing/  (Navbar, Footer, Hero, LogoCloud, HowItWorks, Features, Niches, Showcase, Pricing, Testimonials, FAQ, CTA, Logo)
-│  └─ dashboard/  (Sidebar, TopBar)
-└─ lib/
-   ├─ brand.ts                      # Brand constants — change name/colours here
-   └─ data.ts                       # Niches, art styles, voices, plans, FAQs, testimonials
-```
-
-The **core mechanic** lives in `src/app/dashboard/create/page.tsx` —
-the 7-step wizard (Niche → Style → Voice → Music → Schedule → Accounts → Review)
-that creates a Series. The Series is then "fed" by the API pipeline below.
-
----
-
-## Run it
+## Setup
 
 ```bash
 npm install
-npm run dev
-# open http://localhost:3000
+cp .env.example .env.local   # fill in the keys below
+npm run dev                  # http://localhost:3000
 ```
 
-The marketing site, dashboard pages and Create-Series wizard run with zero env
-vars. To use the **`/studio` live playground** (script → image → voice with
-your own keys) set the three required env vars below.
-
-### Tier 1 — required for the studio pipeline
-
-The studio works end-to-end with just these two:
-
-| Variable | Provider | Used for |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | [Anthropic](https://console.anthropic.com) | Script writing + splitting your pasted scripts into scenes (Claude Sonnet 4.6) |
-| `OPENAI_API_KEY` | [OpenAI](https://platform.openai.com) | Image generation (`gpt-image-1`) + voiceover (`gpt-4o-mini-tts`, ~$0.015/min) |
-
-With only these set, you can compose and download finished MP4s — but they're
-not saved anywhere; you just download them.
-
-### Tier 2 — required to save videos to your library
-
-| Variable | Provider | Used for |
-|---|---|---|
-| `DATABASE_URL` | Vercel Postgres / Neon | Stores users, series, videos |
-| `AUTH_SECRET` | self (`openssl rand -base64 32`) | NextAuth JWT signing |
-| `GOOGLE_CLIENT_ID` | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) | Sign in with Google |
-| `GOOGLE_CLIENT_SECRET` | same | same |
-| `BLOB_READ_WRITE_TOKEN` | Vercel Blob (auto-set by Vercel when enabled) | Stores finished MP4s |
-
-If any of Tier 2 is missing, the app degrades gracefully — sign-in falls through
-to anonymous mode and "save to library" politely says "set up the DB to save".
-
-### Tier 3 — optional upgrades
-
-| Variable | Why you'd set it |
-|---|---|
-| `ELEVENLABS_API_KEY` | Premium narrator voice. Toggle "ElevenLabs" in the studio voice dropdown. |
-| `REPLICATE_API_TOKEN` | Swap images to Flux Schnell (~$0.003/img, 4× cheaper than OpenAI). |
-
----
-
-## Picking the right OpenAI voice
-
-The `/studio` voice dropdown defaults to `onyx` because it suits the most
-common faceless niches (mythology, true crime, history). Pick by content:
-
-| Voice | When to use |
-|---|---|
-| **Onyx** | Documentary · true crime · mythology · history. Deep, authoritative. |
-| **Ash** | Luxury · history · explainer. Warm baritone. |
-| **Echo** | News · tech · hype. Clear, articulate male. |
-| **Verse** | Motivation · stoic · sports. Dramatic male. |
-| **Fable** | Storytelling · fairy tales. British male. |
-| **Ballad** | ASMR-adjacent · reflective. Soft, expressive male. |
-| **Nova** | Explainer · lifestyle. Energetic female. |
-| **Sage** | Psychology · wellness. Calm, thoughtful female. |
-| **Coral** | Personal stories. Warm, expressive female. |
-| **Shimmer** | Calm / ASMR-adjacent. Soft female. |
-| **Alloy** | Neutral all-rounder. |
-
-OpenAI TTS pricing (`gpt-4o-mini-tts`): ~$0.015 per spoken minute. A 60-second
-reel costs ~$0.015. ElevenLabs at the same length is ~$0.18.
-
----
-
-## Picking the right image model
-
-The `/studio` image route is wired to **OpenAI gpt-image-1** by default — easy
-because you already have the key. The quality dropdown picks the cost tier.
-
-| Model | Cost / 1024×1536 image | Quality (cinematic realism) | When to pick |
-|---|---|---|---|
-| OpenAI `gpt-image-1` low | ~$0.011 | OK — text on cards, simple subjects | Quick iteration |
-| **OpenAI `gpt-image-1` medium** *(default)* | **~$0.042** | **Strong photoreal, this is the sweet spot** | Most reels |
-| OpenAI `gpt-image-1` high | ~$0.167 | Excellent | Hero shots, premium niches |
-| Replicate **Flux Schnell** | ~$0.003 | Decent for stylised; weaker for photoreal humans | High-volume cheap factory |
-| Replicate **Flux Dev** | ~$0.025 | Strong, faster than gpt-image-1 medium | Volume + photoreal |
-| Replicate **Flux 1.1 Pro Ultra** | ~$0.05 | **Top-tier photoreal, our recommended cinematic realism choice** | Flagship channels |
-| fal.ai **Flux Pro** | ~$0.05 | Same as above, faster cold start | Same |
-| Google **Imagen 3** | ~$0.04 | Strong faces, slightly more "stock photo" feel | Lifestyle / luxury |
-
-**Cheapest decent option:** OpenAI `gpt-image-1` low at $0.011.
-**Best price/quality balance:** OpenAI `gpt-image-1` medium at $0.042.
-**Best cinematic realism:** Flux 1.1 Pro Ultra on Replicate at ~$0.05 — once you set `REPLICATE_API_TOKEN` in Vercel envs, ask me to wire the alternate image route and the studio dropdown will offer it.
-
-### Per-video cost (6-scene, ~60-second reel)
-
-| Stack | Cost |
-|---|---|
-| Cheapest (OpenAI low + OpenAI TTS) | ~$0.08 |
-| **Default (OpenAI medium + OpenAI TTS)** | **~$0.27** |
-| Premium (Flux Pro Ultra + ElevenLabs) | ~$0.48 |
-| BYO audio (no TTS) — just adds Whisper at ~$0.006/min | ~$0.26 |
-
----
-
-## Three input modes in the Studio
-
-The studio's Step 1 has a three-way toggle:
-
-### 1. "Write it for me"
-Claude writes the script + image prompts from a topic. We then TTS each scene
-with OpenAI and compose per-scene clips into the final MP4.
-
-### 2. "Paste my script"
-You paste a script verbatim. Claude only splits it into scenes + adds image
-prompts — never rewrites your words. TTS + compose same as above.
-
-### 3. "Upload my audio" (NEW)
-You upload an MP3 / WAV / M4A / WEBM. Pipeline:
-
-1. **Whisper transcribes** the audio at word-level timestamps. We also
-   detect silence gaps > 0.3s — those are the natural beats.
-2. **Claude plans scenes** that align to those beats (sentence ends,
-   pauses, topic shifts) — never cuts mid-sentence. Each scene gets a
-   start/end second + a cinematic image prompt.
-3. **You generate images** as before — gpt-image-1 in your chosen style.
-4. **Compose** uses the timeline mode of `ffmpeg.wasm`: each image is held
-   for its scene's duration, then everything is muxed under your original
-   audio track.
-
-Limits:
-- The Vercel serverless body limit is ~4.5 MB (≈3-4 minutes of MP3 at
-  128 kbps). For longer files we'd switch the upload to Vercel Blob and
-  pass the Blob URL to Whisper — small follow-up if you need it.
-- Whisper costs $0.006 per minute of audio.
-
-### What this unlocks
-- Use your own voice (record on your phone, upload).
-- Use a podcast clip, a movie monologue you have rights to, or a generated
-  voice from another tool.
-- Match scene cuts to actual emotional beats in the speech, not just
-  evenly-spaced timestamps.
-
-### Vercel deploy walkthrough
-
-1. **Import the repo** at https://vercel.com/new → branch `claude/clone-facelessreels-site-aEYUr` (or `main` after merging).
-2. **Storage → Create Database → Postgres** (free tier). Vercel auto-injects `DATABASE_URL`, `POSTGRES_URL` etc.
-3. **Storage → Create Blob Store**. Vercel auto-injects `BLOB_READ_WRITE_TOKEN`.
-4. **Settings → Environment Variables**: add `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`.
-5. **Google Cloud Console** → OAuth consent screen + Credentials → add the redirect URI `https://<your-domain>.vercel.app/api/auth/callback/google`.
-6. **Push migrations**: from your laptop, `DATABASE_URL=… npx prisma db push` (or wire it into Vercel's deploy command).
-7. **Redeploy**. Done.
-
-The app is **free during open beta** — no Stripe, no paywall, no subscription
-gating. You only pay your AI providers for what you actually generate.
-
----
-
-## The video-generation pipeline
-
-For every episode of a Series, the backend runs:
-
-```
- ┌── 1. SCRIPT ──────────────┐  Anthropic Claude (recommended) or OpenAI GPT
- │   30-60s, hook in 3s,     │  Output: scenes[] with on-screen text + image prompts
- │   tuned to the niche      │
- └────────────┬──────────────┘
-              │
- ┌── 2. IMAGES ──────────────┐  Replicate (Flux / SDXL) or fal.ai or Stability
- │   1 image per scene,      │  Output: signed URLs, 9:16
- │   in the chosen art style │
- └────────────┬──────────────┘
-              │
- ┌── 3. VOICEOVER ───────────┐  ElevenLabs (multilingual_v2) — best voice quality
- │   AI narrator reads       │  Or OpenAI TTS, PlayHT
- │   the script              │  Output: MP3 / WAV
- └────────────┬──────────────┘
-              │
- ┌── 4. MUSIC BED ───────────┐  Library / user upload / TikTok-sound link
- │   Royalty-free or custom  │  Output: looped MP3
- └────────────┬──────────────┘
-              │
- ┌── 5. CAPTIONS ────────────┐  OpenAI Whisper or Deepgram (word-level timestamps)
- │   Word-by-word burned in  │  Output: ASS / animated overlay timeline
- └────────────┬──────────────┘
-              │
- ┌── 6. RENDER ──────────────┐  Remotion Lambda  OR  Shotstack  OR  Creatomate
- │   Compose into 9:16 MP4   │  Output: MP4 in S3 / R2
- └────────────┬──────────────┘
-              │
- ┌── 7. SCHEDULE + POST ─────┐  Inngest / Trigger.dev cron at user's time-of-day
- │   Push to each platform   │  TikTok / Instagram / YouTube via official APIs
- └───────────────────────────┘
-```
-
----
-
-## All APIs / external services you need
-
-Every external dependency, grouped by job-to-be-done. Free-tier viable for
-prototype, paid in production.
-
-### 🔐 Auth
-| Service | What it does | Why |
-|---|---|---|
-| **NextAuth.js (Auth.js)** | Email + OAuth login | Open source, plug-and-play with Next.js |
-| **Clerk** *(alternative)* | Hosted auth + UI | Faster MVP, paid past free tier |
-| **Google OAuth** | Sign in with Google | Lowest friction signup |
-
-### 🗄️ Database
-| Service | What it does |
-|---|---|
-| **PostgreSQL** (Supabase / Neon / Railway) | Users, series, videos, jobs, social accounts, billing |
-| **Prisma** or **Drizzle** | ORM/migrations |
-| **Redis** (Upstash) | Rate limiting, queue locks, caching |
-
-### 🧠 AI: scripts (LLM)
-| Service | Use it for | API |
-|---|---|---|
-| **Anthropic Claude** | Hook-driven script writing | `@anthropic-ai/sdk` — `claude-sonnet-4-6` is the right default; upgrade to `claude-opus-4-7` for premium niches |
-| **OpenAI GPT** *(alternative)* | Same | `openai` SDK — `gpt-4o` / `gpt-4o-mini` |
-
-### 🖼️ AI: images / b-roll
-| Service | Use it for |
-|---|---|
-| **Replicate** | Run Flux Schnell / Flux Dev / SDXL via one API |
-| **fal.ai** | Faster cold-start, good Flux endpoints |
-| **Stability AI** | SD3 / SD Ultra |
-| **Midjourney** *(unofficial)* | Highest aesthetic quality, no public API — use a relay service |
-
-### 🎙️ AI: voice (TTS)
-| Service | Use it for |
-|---|---|
-| **ElevenLabs** | **Recommended.** Best narrator voices + voice cloning for the Scale plan |
-| **OpenAI TTS** | Cheap fallback, decent quality |
-| **PlayHT** | Alternative cloning provider |
-
-### 🎵 Music
-| Service | Use it for |
-|---|---|
-| **Mubert API** | AI-generated royalty-free tracks per mood |
-| **Pixabay Music API** | Free royalty-free library |
-| **Soundstripe** | Curated catalogue |
-| **TikTok Sound** | Resolved client-side from a TikTok music URL the user pastes |
-
-### 📝 Captions / forced alignment
-| Service | Use it for |
-|---|---|
-| **OpenAI Whisper** (`whisper-1`, word_timestamps) | Word-level caption timing |
-| **Deepgram** | Faster, cheaper alternative |
-
-### 🎬 Video render
-| Service | Use it for |
-|---|---|
-| **Remotion + @remotion/lambda** | Self-host on AWS Lambda. React-based templates, full control. **Recommended for serious scale.** |
-| **Shotstack** | Hosted render API, JSON timelines |
-| **Creatomate** | Hosted render API, template-driven |
-
-### 📦 Storage / CDN
-| Service | Use it for |
-|---|---|
-| **AWS S3** or **Cloudflare R2** | Store images, audio, MP4s |
-| **Cloudflare CDN** | Public delivery of finished videos |
-
-### ⚙️ Background jobs / scheduler
-| Service | Use it for |
-|---|---|
-| **Inngest** | **Recommended.** Step functions + cron + retries; fits the multi-stage pipeline perfectly |
-| **Trigger.dev** | Alternative |
-| **BullMQ + Redis** | DIY route |
-
-### 📲 Social posting (the hard part)
-| Service | Use it for | Notes |
-|---|---|---|
-| **TikTok Content Posting API** | Auto-post to TikTok | Requires app review for `video.publish` scope. Use the resumable upload flow. [docs](https://developers.tiktok.com/doc/content-posting-api-get-started) |
-| **Instagram Graph API** | Auto-post Reels | Requires a Meta Business account + IG-Business linked. `instagram_content_publish` permission. [docs](https://developers.facebook.com/docs/instagram-platform/content-publishing) |
-| **YouTube Data API v3** | Auto-post Shorts | Use `videos.insert` resumable upload. Add `#shorts` to the title. [docs](https://developers.google.com/youtube/v3/docs/videos/insert) |
-
-> All three platforms require an OAuth app and review for posting scopes —
-> this is the longest-lead-time piece of going live. Start the app review
-> processes early.
-
-### 💳 Payments
-| Service | Use it for |
-|---|---|
-| **Stripe** | Subscriptions ($19 / $39 / $69), usage-based add-ons, customer portal, invoices |
-
-### ✉️ Email
-| Service | Use it for |
-|---|---|
-| **Resend** | Transactional (welcome, video-ready, payment failed, weekly digest) |
-| **Postmark** *(alt)* | Same |
-
-### 📊 Analytics + product feedback
-| Service | Use it for |
-|---|---|
-| **PostHog** | Product analytics + feature flags + session replay |
-| **Plausible** | Privacy-first marketing-page analytics |
-
-### 🧯 Observability
-| Service | Use it for |
-|---|---|
-| **Sentry** | Frontend + API error tracking |
-| **Axiom** or **Logtail** | Structured logs from the render pipeline |
-
----
-
-## Minimum viable API set (to actually ship a working product)
-
-If you only sign up for these, you can ship:
-
-1. **NextAuth** + **Google OAuth** — login
-2. **Supabase** (Postgres + Auth + Storage in one) — DB + file store
-3. **Anthropic Claude** — scripts
-4. **Replicate** (Flux Schnell) — images
-5. **ElevenLabs** — voice
-6. **Pixabay Music API** — royalty-free music
-7. **Remotion Lambda** *(or Shotstack)* — render
-8. **Inngest** — cron + pipeline orchestration
-9. **TikTok / Instagram / YouTube** posting APIs
-10. **Stripe** — billing
-11. **Resend** — email
-
-Everything else is nice-to-have.
-
----
-
-## Changing the brand
-
-All branding is centralised:
-
-- **Name + tagline + socials** — `src/lib/brand.ts`
-- **Colour palette** — `tailwind.config.ts` (`brand`, `accent`, `bg`, `ink`, `line`)
-- **Logo mark** — `src/components/marketing/Logo.tsx`
-- **Niches / art styles / voices / pricing / FAQ / testimonials** — `src/lib/data.ts`
-
-The code does not hardcode strings outside these files.
-
----
-
-## License
-
-This is a re-branded clone built for educational reference. Ship something that
-respects the originals' trademarks and the platform terms of service of TikTok,
-Instagram and YouTube.
+| Variable | Needed for |
+| --- | --- |
+| `YOUTUBE_API_KEY` | Overview and Competitors. Get it from Google Cloud → APIs & Services → Credentials, and enable **YouTube Data API v3**. Optional on the server: each person can paste their own key in Settings, where it stays in their browser. |
+| `NEXT_PUBLIC_DEFAULT_CHANNEL` | Optional. Our `@handle`, so Settings starts filled in. |
+| `ANTHROPIC_API_KEY` | AI Desk only. Every other page works without it. |
+
+It deploys to Vercel as-is. Drafts, plans and settings live in each browser's local storage.
+There's no database and no login, so don't put it on a public URL you wouldn't want others using
+your API quota on. Put it behind Vercel's password protection or deploy it privately.
+
+## Claude Code
+
+The `/yt-*` skills in [`.claude/skills`](.claude/skills) also work directly in Claude Code
+inside this repo. Vendored from
+[Jakeschincariol/youtube-agent-skill](https://github.com/Jakeschincariol/youtube-agent-skill),
+MIT licensed ([licence](.claude/skills/YT-SKILLS-LICENSE)).
